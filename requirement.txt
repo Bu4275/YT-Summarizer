@@ -1,0 +1,12 @@
+flask
+flask-socketio
+yt-dlp
+faster-whisper
+openai
+python-socketio
+sqlalchemy
+python-dotenv
+pyyaml
+torch
+torchvision
+torchaudio

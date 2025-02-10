@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>歷史記錄 - YouTube 智能摘要</title>
+    <!-- Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- 添加 Marked.js 和 代碼高亮 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
+    <!-- 添加程式碼高亮支援 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+
+    <style>
+        .gradient-custom {
+            background: linear-gradient(to right, #667eea, #764ba2);
+        }
+        #summaryContent {
+            white-space: pre-wrap;       /* 保留空格和換行，但允許自動換行 */
+            word-wrap: break-word;       /* 允許長單詞斷行 */
+            overflow-wrap: break-word;   /* 現代瀏覽器的斷行屬性 */
+            max-width: 100%;             /* 確保不會超出容器寬度 */
+            font-family: monospace;      /* 等寬字體，保持格式化文本的對齊 */
+            font-size: 0.9rem;           /* 稍微縮小字體大小 */
+            line-height: 1.5;            /* 適當的行高 */
+            margin: 0;                   /* 移除預設邊距 */
+            padding: 1rem;               /* 添加內邊距 */
+            background-color: #f8f9fa;   /* 淺色背景 */
+            border-radius: 0.25rem;      /* 圓角 */
+        }
+        .modal-dialog {
+            max-width: 800px;  /* 更大的對話框寬度 */
+        }
+        .modal-body {
+            max-height: 70vh;  /* 最大高度為視窗高度的 70% */
+            overflow-y: auto;  /* 垂直方向可滾動 */
+        }
+        .table-container {
+            position: relative;  /* 為了正確定位下拉選單 */
+            width: 100%;
+            overflow: visible !important;  /* 允許下拉選單溢出 */
+        }
+        
+        .table-responsive {
+            overflow: visible !important;  /* 允許下拉選單溢出 */
+        }
+        
+        .dropdown-menu {
+            position: absolute;
+            z-index: 1000;  /* 確保下拉選單顯示在其他元素上方 */
+        }
+        
+        /* 調整操作欄位的位置和寬度 */
+        .action-column {
+            position: relative;
+            min-width: 200px;  /* 確保有足夠空間顯示按鈕 */
+        }
+        
+        /* 確保表格內容不會被截斷 */
+        .table td {
+            white-space: normal;
+            vertical-align: middle;
+        }
+        /* Markdown 內容樣式 */
+        .markdown-content {
+            padding: 15px;
+            line-height: 1.6;
+            font-size: 1rem;
+            color: #24292e;
+        }
+        
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+        
+        .markdown-content h1 { font-size: 2em; }
+        .markdown-content h2 { font-size: 1.5em; }
+        .markdown-content h3 { font-size: 1.25em; }
+        
+        .markdown-content ul,
+        .markdown-content ol {
+            padding-left: 2em;
+            margin-bottom: 16px;
+        }
+        
+        .markdown-content li {
+            margin: 0.25em 0;
+        }
+        
+        .markdown-content code {
+            padding: 0.2em 0.4em;
+            margin: 0;
+            font-size: 85%;
+            background-color: rgba(27,31,35,0.05);
+            border-radius: 3px;
+        }
+        
+        .markdown-content pre code {
+            padding: 16px;
+            overflow: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            background-color: #f6f8fa;
+            border-radius: 6px;
+            display: block;
+        }
+        
+        .markdown-content blockquote {
+            padding: 0 1em;
+            color: #6a737d;
+            border-left: 0.25em solid #dfe2e5;
+            margin: 0 0 16px 0;
+        }
+        
+        .markdown-content table {
+            border-spacing: 0;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+            width: 100%;
+        }
+        
+        .markdown-content table th,
+        .markdown-content table td {
+            padding: 6px 13px;
+            border: 1px solid #dfe2e5;
+        }
+        
+        .markdown-content table tr:nth-child(2n) {
+            background-color: #f6f8fa;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark gradient-custom">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-youtube me-2"></i>YouTube 智能摘要
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="bi bi-house-door"></i> 首頁
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/history">
+                            <i class="bi bi-clock-history"></i> 歷史記錄
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/tasks">
+                            <i class="bi bi-list-task"></i> 任務狀態
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>處理記錄</h5>
+                        <button id="batchDeleteBtn" 
+                                class="btn btn-danger btn-sm" 
+                                style="display: none;" 
+                                onclick="confirmBatchDelete()">
+                            <i class="bi bi-trash"></i> 刪除所選項目
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>
+                                                <input type="checkbox" 
+                                                       class="form-check-input" 
+                                                       id="selectAll" 
+                                                       onclick="toggleSelectAll()">
+                                            </th>
+                                            <th>時間</th>
+                                            <th>影片標題</th>
+                                            <th>語言</th>
+                                            <th>摘要類型</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for record in records %}
+                                        <tr>
+                                            <td>
+                                                <input type="checkbox" 
+                                                       class="form-check-input record-checkbox" 
+                                                       value="{{ record.id }}" 
+                                                       data-title="{{ record.video_title }}">
+                                            </td>
+                                            <td>{{ record.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                            <td>
+                                                <a href="{{ record.video_source }}" target="_blank">
+                                                    {{ record.video_title }}
+                                                </a>
+                                            </td>
+                                            <td>{{ record.language }}</td>
+                                            <td>{{ record.prompt_type }}</td>
+                                            <td>
+                                                <div class="d-flex gap-2">
+                                                    <button class="btn btn-sm btn-primary" 
+                                                            onclick="viewSummary({{ record.id }})">
+                                                        <i class="bi bi-eye"></i> 查看摘要
+                                                    </button>
+                                                    <button class="btn btn-sm btn-success" 
+                                                            onclick="showResummaryModal({{ record.id }}, '{{ record.language }}')">
+                                                        <i class="bi bi-arrow-repeat"></i> 重新摘要
+                                                    </button>
+                                                    <div class="dropdown">
+                                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" 
+                                                                type="button" 
+                                                                data-bs-toggle="dropdown">
+                                                            <i class="bi bi-download"></i> 下載
+                                                        </button>
+                                                        <ul class="dropdown-menu">
+                                                            <li>
+                                                                <a class="dropdown-item" 
+                                                                   href="/download/{{ record.id }}/audio">
+                                                                   音頻文件
+                                                                </a>
+                                                            </li>
+                                                            <li>
+                                                                <a class="dropdown-item" 
+                                                                   href="/download/{{ record.id }}/transcript">
+                                                                   轉錄文本
+                                                                </a>
+                                                            </li>
+                                                            <li>
+                                                                <a class="dropdown-item" 
+                                                                   href="/download/{{ record.id }}/summary">
+                                                                   摘要文件
+                                                                </a>
+                                                            </li>
+                                                        </ul>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-danger" 
+                                                            onclick="confirmDelete({{ record.id }}, '{{ record.video_title }}')">
+                                                        <i class="bi bi-trash"></i> 刪除
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                <!-- Toast Container -->
+                                <div aria-live="polite" aria-atomic="true" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
+                                    <!-- 通用 Toast -->
+                                    <div id="generalToast" class="toast align-items-center border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                                        <div class="d-flex">
+                                            <div id="generalToastBody" class="toast-body">
+                                                <!-- 動態顯示消息內容 -->
+                                            </div>
+                                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改摘要內容模態框 -->
+    <div class="modal fade" id="summaryModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">摘要內容</h5>
+                    <div class="ms-auto me-2 d-flex gap-2">
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="viewMode" id="markdownView" checked>
+                            <label class="btn btn-sm btn-outline-primary" for="markdownView">
+                                <i class="bi bi-markdown"></i> Markdown
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="viewMode" id="rawView">
+                            <label class="btn btn-sm btn-outline-primary" for="rawView">
+                                <i class="bi bi-text-left"></i> 原始文本
+                            </label>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="copySummary()">
+                            <i class="bi bi-clipboard"></i> 複製
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <!-- 包裝兩種視圖的容器 -->
+                    <div id="summaryContentWrapper">
+                        <div id="markdownContent" class="markdown-content"></div>
+                        <pre id="rawContent" class="d-none" style="white-space: pre-wrap; font-size: 0.9rem;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重新摘要模態框 -->
+    <div class="modal fade" id="resummaryModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">重新摘要</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="resummaryForm">
+                        <input type="hidden" id="recordId" name="recordId">
+                        <input type="hidden" id="language" name="language">
+                        <div class="mb-3">
+                            <label for="promptType" class="form-label">選擇摘要類型</label>
+                            <select class="form-select" id="promptType" name="promptType">
+                                {% for key, prompt in prompts.items() %}
+                                <option value="{{ key }}" title="{{ prompt.description }}">
+                                    {{ prompt.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="resummaryStatus" class="alert alert-info d-none">
+                            處理中...
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="submitResummary()">開始重新摘要</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加刪除確認模態框 -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">確認刪除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>確定要刪除以下記錄嗎？</p>
+                    <p id="deleteTitle" class="text-danger fw-bold"></p>
+                    <p class="text-muted small">注意：這個操作無法復原，相關的音頻、轉錄和摘要文件都會被刪除。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="deleteRecord()">確定刪除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量刪除確認模態框 -->
+    <div class="modal fade" id="batchDeleteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">確認批量刪除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>確定要刪除以下記錄嗎？</p>
+                    <div id="selectedItemsList" class="text-danger">
+                    </div>
+                    <p class="text-muted small mt-3">注意：這個操作無法復原，相關的所有文件都會被永久刪除。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="executeBatchDelete()">確定刪除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 確保在腳本開頭初始化 Socket.IO
+        const socket = io();
+        let recordToDelete = null;
+        let deleteModal = null;
+        
+        // 等待 DOM 完全加載
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化 Modal
+            deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            
+            // 初始化所有工具提示
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+        
+        function confirmDelete(recordId, title) {
+            if (!deleteModal) {
+                deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+            }
+            recordToDelete = recordId;
+            document.getElementById('deleteTitle').textContent = title;
+            deleteModal.show();
+        }
+        
+
+        function showResummaryModal(recordId, language) {
+            document.getElementById('recordId').value = recordId;
+            document.getElementById('language').value = language;
+            new bootstrap.Modal(document.getElementById('resummaryModal')).show();
+        }
+        
+        function submitResummary() {
+            const form = document.getElementById('resummaryForm');
+            const formData = new FormData(form);
+            const statusDiv = document.getElementById('resummaryStatus');
+            
+            statusDiv.textContent = '處理中...';
+            statusDiv.classList.remove('d-none');
+            
+            fetch('/resummary', {
+                method: 'POST',
+                body: formData
+            });
+        }
+        
+        socket.on('resummary_complete', function(data) {
+            const statusDiv = document.getElementById('resummaryStatus');
+            statusDiv.textContent = '處理完成！將在 1 秒後重新載入頁面...';
+            statusDiv.classList.remove('alert-info');
+            statusDiv.classList.add('alert-success');
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        });
+        
+        socket.on('resummary_error', function(data) {
+            const statusDiv = document.getElementById('resummaryStatus');
+            statusDiv.textContent = '處理失敗：' + data.error;
+            statusDiv.classList.remove('alert-info');
+            statusDiv.classList.add('alert-danger');
+        });
+
+        // for markdown content
+        let currentSummaryText = ''; // 存儲原始文本
+
+        function viewSummary(recordId) {
+            fetch(`/get_summary/${recordId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentSummaryText = data.content;
+                        updateSummaryView();
+                        new bootstrap.Modal(document.getElementById('summaryModal')).show();
+                    } else {
+                        alert('無法載入摘要內容');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+        
+        function updateSummaryView() {
+            const markdownContent = document.getElementById('markdownContent');
+            const rawContent = document.getElementById('rawContent');
+            
+            // 更新兩種視圖的內容
+            markdownContent.innerHTML = marked.parse(currentSummaryText);
+            rawContent.textContent = currentSummaryText;
+            
+            // 啟用代碼高亮
+            document.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightBlock(block);
+            });
+        }
+        
+        // 監聽視圖切換按鈕
+        document.getElementById('markdownView').addEventListener('change', function() {
+            document.getElementById('markdownContent').classList.remove('d-none');
+            document.getElementById('rawContent').classList.add('d-none');
+        });
+        
+        document.getElementById('rawView').addEventListener('change', function() {
+            document.getElementById('markdownContent').classList.add('d-none');
+            document.getElementById('rawContent').classList.remove('d-none');
+        });
+        
+        function copySummary() {
+            navigator.clipboard.writeText(currentSummaryText)
+                .then(() => {
+                    // 顯示 Toast
+                    showToast('摘要內容已複製到剪貼板', 'success');
+                })
+                .catch(err => {
+                    console.error('複製失敗：', err);
+                });
+        }
+
+        // 新增的批量刪除相關功能
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.getElementsByClassName('record-checkbox');
+            for (let checkbox of checkboxes) {
+                checkbox.checked = selectAll.checked;
+            }
+            updateBatchDeleteButton();
+        }
+
+        function updateBatchDeleteButton() {
+            const checkboxes = document.getElementsByClassName('record-checkbox');
+            const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+            batchDeleteBtn.style.display = selectedCount > 0 ? 'block' : 'none';
+            batchDeleteBtn.textContent = `刪除所選項目 (${selectedCount})`;
+        }
+
+        // 刪除單個記錄
+        function deleteRecord() {
+            if (!recordToDelete) return;
+        
+            fetch(`/delete_record/${recordToDelete}`, {
+                method: 'POST'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (deleteModal) {
+                            deleteModal.hide();
+                        }
+                        // 使用 Toast 顯示成功消息
+                        showToast('記錄已成功刪除！', 'success');
+        
+                        // 重新載入頁面
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500); // 延遲 1.5 秒再重新載入頁面
+                    } else {
+                        // 使用 Toast 顯示錯誤消息
+                        showToast('刪除失敗：' + (data.error || '未知錯誤'), 'danger');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // 使用 Toast 顯示錯誤消息
+                    showToast('刪除失敗：' + error.message, 'danger');
+                });
+        }
+        
+
+        // 為所有的復選框添加更改事件監聽器
+        document.addEventListener('DOMContentLoaded', function() {
+            const checkboxes = document.getElementsByClassName('record-checkbox');
+            for (let checkbox of checkboxes) {
+                checkbox.addEventListener('change', updateBatchDeleteButton);
+            }
+        });
+
+        function confirmBatchDelete() {
+            const checkboxes = document.getElementsByClassName('record-checkbox');
+            const selectedItems = Array.from(checkboxes)
+                .filter(cb => cb.checked)
+                .map(cb => ({
+                    id: cb.value,
+                    title: cb.dataset.title
+                }));
+
+            const listHtml = selectedItems
+                .map(item => `<div class="mb-1">• ${item.title}</div>`)
+                .join('');
+            
+            document.getElementById('selectedItemsList').innerHTML = listHtml;
+            new bootstrap.Modal(document.getElementById('batchDeleteModal')).show();
+        }
+
+        async function executeBatchDelete() {
+            const checkboxes = document.getElementsByClassName('record-checkbox');
+            const selectedIds = Array.from(checkboxes)
+                .filter(cb => cb.checked)
+                .map(cb => cb.value);
+        
+            if (selectedIds.length === 0) {
+                showToast('請選擇至少一條記錄進行刪除', 'danger');
+                return;
+            }
+        
+            try {
+                const response = await fetch('/batch_delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: selectedIds })
+                });
+        
+                const result = await response.json();
+                if (result.success) {
+                    showToast('選定的記錄已成功刪除！', 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    showToast('刪除失敗：' + (result.error || '未知錯誤'), 'danger');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast('刪除失敗：' + error.message, 'danger');
+            }
+        }
+        function showToast(message, type) {
+            const toastElement = document.getElementById('generalToast');
+            const toastBody = document.getElementById('generalToastBody');
+        
+            // 設置消息內容
+            toastBody.textContent = message;
+        
+            // 根據類型設定樣式
+            toastElement.className = `toast align-items-center text-bg-${type} border-0`;
+        
+            // 顯示 Toast
+            const toast = new bootstrap.Toast(toastElement);
+            toast.show();
+        }
+
+    </script>
+</body>
+</html>

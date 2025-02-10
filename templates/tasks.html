@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任務狀態 - YouTube 智能摘要</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        .gradient-custom {
+            background: linear-gradient(to right, #667eea, #764ba2);
+        }
+        .task-status-badge {
+            min-width: 100px;
+            text-align: center;
+        }
+        .task-progress {
+            transition: width 0.5s ease;
+        }
+        .task-card {
+            transition: all 0.3s ease;
+        }
+        /* 固定卡片高度 */
+        .task-card {
+            height: 100%;
+        }
+        .card-body {
+            display: flex;
+            flex-direction: column;
+        }
+        /* 避免內容溢出 */
+        .card-text {
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark gradient-custom">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-youtube me-2"></i>YouTube 智能摘要
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/"><i class="bi bi-house-door"></i> 首頁</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history"><i class="bi bi-clock-history"></i> 歷史記錄</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/tasks"><i class="bi bi-list-task"></i> 任務狀態</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <!-- 初始載入的任務 -->
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const socket = io();
+        let taskUpdates = {};
+        
+        // 更新特定任務的狀態
+        function updateTaskCard(taskData) {
+            const taskElement = document.getElementById(`task-${taskData.id}`);
+            if (taskElement) {
+                // 暫存這次的更新
+                taskUpdates[taskData.id] = taskData;
+            } else {
+                // 如果是新任務，添加到容器開頭
+                const taskContainer = document.querySelector('.row');
+                const noTasksAlert = taskContainer.querySelector('.alert-info');
+                if (noTasksAlert) {
+                    noTasksAlert.remove();
+                }
+                taskContainer.insertAdjacentHTML('afterbegin', createTaskCard(taskData));
+            }
+        }
+        
+        // 實際更新 DOM 的函數
+        function applyTaskUpdates() {
+            for (const [taskId, taskData] of Object.entries(taskUpdates)) {
+                const taskElement = document.getElementById(`task-${taskId}`);
+                if (taskElement) {
+                    taskElement.outerHTML = createTaskCard(taskData);
+                }
+            }
+            taskUpdates = {}; // 清空更新隊列
+        }
+        
+        // 獲取任務狀態的顯示文本和樣式
+        function getTaskStatusDisplay(status) {
+            const statusConfig = {
+                'waiting': { text: '等待中', class: 'bg-warning' },
+                'processing': { text: '處理中', class: 'bg-primary' },
+                'completed': { text: '已完成', class: 'bg-success' },
+                'failed': { text: '失敗', class: 'bg-danger' }
+            };
+            return statusConfig[status] || { text: status, class: 'bg-secondary' };
+        }
+        
+        // 格式化時間
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '';
+            return new Date(dateStr).toLocaleString('zh-TW', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+        }
+        
+        // 創建任務卡片 HTML
+        function createTaskCard(task) {
+            const statusDisplay = getTaskStatusDisplay(task.status);
+            const progress = task.progress?.percentage || 0;
+
+            return `
+            <div class="col-md-6 mb-3" id="task-container-${task.id}">
+                <div class="card task-card" id="task-${task.id}">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">任務 #${task.id}</h5>
+                        <span class="badge task-status-badge ${statusDisplay.class}">
+                            ${statusDisplay.text}
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div class="task-info">
+                            <p class="card-text"><strong>URL:</strong> <a href="${task.source}" target="_blank" style="max-width: 300px;">${task.source}</a></p>
+                            <p class="card-text"><strong>語言:</strong> ${task.language}</p>
+                            <p class="card-text"><strong>摘要類型:</strong> ${task.prompt_type}</p>
+                        </div>
+                        
+                        <div class="progress mb-3" style="height: 20px;">
+                            <div class="progress-bar task-progress ${task.status === 'processing' ? 'progress-bar-striped progress-bar-animated' : ''}"
+                                role="progressbar"
+                                style="width: ${progress}%"
+                                aria-valuenow="${progress}"
+                                aria-valuemin="0"
+                                aria-valuemax="100">
+                                ${progress}%
+                            </div>
+                        </div>
+                        
+                        <p class="card-text"><strong>狀態:</strong> ${task.progress?.message || statusDisplay.text}</p>
+                        
+                        ${task.error ? `
+                        <div class="alert alert-danger mt-2">
+                            <strong>錯誤:</strong> ${task.error}
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="card-footer">
+                        <small class="text-muted">
+                            <div>創建時間: ${formatDateTime(task.created_at)}</div>
+                            ${task.started_at ? `<div>開始時間: ${formatDateTime(task.started_at)}</div>` : ''}
+                            ${task.completed_at ? `<div>完成時間: ${formatDateTime(task.completed_at)}</div>` : ''}
+                        </small>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        // 更新任務卡片內容
+        function updateTaskContent(taskElement, task) {
+            const statusDisplay = getTaskStatusDisplay(task.status);
+            const progress = task.progress?.percentage || getProgressPercentage(task);
+            
+            // 更新狀態標籤
+            const statusBadge = taskElement.querySelector('.task-status-badge');
+            statusBadge.className = `badge task-status-badge ${statusDisplay.class}`;
+            statusBadge.textContent = statusDisplay.text;
+            
+            // 更新進度條
+            const progressBar = taskElement.querySelector('.progress-bar');
+            progressBar.style.width = `${progress}%`;
+            progressBar.textContent = `${progress}%`;
+            progressBar.className = `progress-bar task-progress ${task.status === 'processing' ? 'progress-bar-striped progress-bar-animated' : ''}`;
+            
+            // 更新狀態訊息
+            const statusMsg = taskElement.querySelector('.task-info + .progress + p.card-text');
+            statusMsg.innerHTML = `<strong>狀態:</strong> ${task.progress?.message || statusDisplay.text}`;
+            
+            // 更新時間資訊
+            const footer = taskElement.querySelector('.card-footer small');
+            footer.innerHTML = `
+                <div>創建時間: ${formatDateTime(task.created_at)}</div>
+                ${task.started_at ? `<div>開始時間: ${formatDateTime(task.started_at)}</div>` : ''}
+                ${task.completed_at ? `<div>完成時間: ${formatDateTime(task.completed_at)}</div>` : ''}
+            `;
+
+            // 處理錯誤消息
+            const existingAlert = taskElement.querySelector('.alert-danger');
+            if (task.error) {
+                if (!existingAlert) {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-danger mt-2';
+                    alertDiv.innerHTML = `<strong>錯誤:</strong> ${task.error}`;
+                    taskElement.querySelector('.card-body').appendChild(alertDiv);
+                } else {
+                    existingAlert.innerHTML = `<strong>錯誤:</strong> ${task.error}`;
+                }
+            } else if (existingAlert) {
+                existingAlert.remove();
+            }
+        }
+
+        // 計算進度百分比
+        function getProgressPercentage(task) {
+            if (task.status === 'completed' || task.status === 'failed') return 100;
+            if (task.status === 'waiting') return 0;
+            if (task.progress?.step) {
+                const [current, total] = task.progress.step.split('/').map(Number);
+                return Math.round((current / total) * 100);
+            }
+            return task.status === 'processing' ? 50 : 0;
+        }
+
+        // 更新任務列表
+        function refreshTaskList() {
+            fetch('/api/tasks')
+                .then(response => response.json())
+                .then(tasks => {
+                    const container = document.querySelector('.row');
+                    
+                    if (tasks.length === 0) {
+                        container.innerHTML = `
+                            <div class="col-12">
+                                <div class="alert alert-info text-center">
+                                    目前沒有任務在處理中
+                                </div>
+                            </div>`;
+                        return;
+                    }
+
+                    // 建立當前任務 ID 集合
+                    const currentTaskIds = new Set(tasks.map(task => task.id));
+                    
+                    // 移除不存在的任務卡片
+                    const existingCards = container.querySelectorAll('[id^="task-container-"]');
+                    existingCards.forEach(card => {
+                        const taskId = card.id.replace('task-container-', '');
+                        if (!currentTaskIds.has(taskId)) {
+                            card.remove();
+                        }
+                    });
+
+                    // 更新或添加任務
+                    tasks.forEach(task => {
+                        const taskContainer = document.getElementById(`task-container-${task.id}`);
+                        if (taskContainer) {
+                            // 更新現有任務
+                            const taskCard = taskContainer.querySelector(`#task-${task.id}`);
+                            if (taskCard) {
+                                updateTaskContent(taskCard, task);
+                            }
+                        } else {
+                            // 添加新任務
+                            container.insertAdjacentHTML('afterbegin', createTaskCard(task));
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error refreshing tasks:', error);
+                });
+        }
+        
+        // 啟動定時更新
+        let refreshInterval;
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshTaskList(); // 初始載入
+            refreshInterval = setInterval(refreshTaskList, 5000); // 每 5 秒更新一次
+        });
+
+        // Socket.IO 事件監聽
+        socket.on('task_update', function(data) {
+            const taskElement = document.getElementById(`task-${data.task_id}`);
+            if (taskElement) {
+                updateTaskContent(taskElement, data.task);
+            } else {
+                refreshTaskList();
+            }
+        });
+
+        // 頁面加載時立即更新一次
+        document.addEventListener('DOMContentLoaded', refreshTaskList);
+    </script>
+</body>
+</html>

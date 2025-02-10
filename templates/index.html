@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube 智能摘要</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .step {
+            flex: 1;
+            position: relative;
+            padding: 0 10px;
+        }
+        .step-circle {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            transition: all 0.3s ease;
+        }
+        .step-line {
+            position: absolute;
+            top: 15px;
+            left: calc(50% + 15px);
+            right: calc(50% - 15px);
+            height: 2px;
+            background-color: #e9ecef;
+        }
+        .step:last-child .step-line {
+            display: none;
+        }
+        .step.active .step-circle {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .step.completed .step-circle {
+            background-color: #198754;
+            color: white;
+        }
+        .step.active .step-line, .step.completed .step-line {
+            background-color: #0d6efd;
+        }
+        .step-title {
+            text-align: center;
+            font-size: 0.8rem;
+            margin-top: 5px;
+            color: #6c757d;
+        }
+        .gradient-custom {
+            background: linear-gradient(to right, #667eea, #764ba2);
+        }
+        .loading-spinner {
+            width: 3rem;
+            height: 3rem;
+        }
+        .gradient-custom {
+            background: linear-gradient(to right, #667eea, #764ba2);
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark gradient-custom">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-youtube me-2"></i>YouTube 智能摘要
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">
+                            <i class="bi bi-house-door"></i> 首頁
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/history">
+                            <i class="bi bi-clock-history"></i> 歷史記錄
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/tasks">
+                            <i class="bi bi-list-task"></i> 任務狀態
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-body">
+
+                        <ul class="nav nav-tabs mb-3" id="inputTabs" role="tablist">
+                            <li class="nav-item">
+                                <a class="nav-link active" id="url-tab" data-bs-toggle="tab" href="#url-input" role="tab">YouTube 網址</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="file-tab" data-bs-toggle="tab" href="#file-input" role="tab">上傳檔案</a>
+                            </li>
+                        </ul>
+                        <div class="tab-content" id="inputTabContent">
+                            <!-- YouTube URL 輸入 -->
+                            <div class="tab-pane fade show active" id="url-input" role="tabpanel">
+                                <form id="summarizeForm" class="mb-4">
+                                    <div class="mb-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text">
+                                                <i class="bi bi-link"></i>
+                                            </span>
+                                            <input type="url" class="form-control" id="videoUrl" 
+                                                placeholder="請輸入 YouTube 影片網址" required>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text">
+                                                <i class="bi bi-translate"></i>
+                                            </span>
+                                            <select class="form-select" id="language" name="language">
+                                                <option value="zh">🇹🇼 中文摘要</option>
+                                                <option value="en">🇺🇸 English Summary</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text">
+                                                <i class="bi bi-chat-text"></i>
+                                            </span>
+                                            <select class="form-select" id="promptType" name="promptType">
+                                                {% for key, prompt in prompts.items() %}
+                                                <option value="{{ key }}" data-bs-toggle="tooltip" title="{{ prompt.description }}">
+                                                    <i class="bi bi-{{ prompt.icon }}"></i> {{ prompt.name }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="bi bi-magic me-2"></i>開始智能摘要
+                                    </button>
+                                </form>
+                            </div>
+
+                            <!-- 檔案上傳 -->
+                            <div class="tab-pane fade" id="file-input" role="tabpanel">
+                                <form id="uploadForm" class="mb-4">
+                                    <div class="mb-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text">
+                                                <i class="bi bi-file-earmark-music"></i>
+                                            </span>
+                                            <input type="file" class="form-control" id="mediaFile" name="file" 
+                                                accept=".mp3,.mp4,.wav,.webm" required>
+                                        </div>
+                                        <small class="text-muted">支援的格式：MP3, MP4, WAV, WEBM</small>
+                                    </div>
+                                    
+                                    <!-- 語言和摘要類型選擇（與 URL 表單相同） -->
+                                    <div class="mb-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text">
+                                                <i class="bi bi-translate"></i>
+                                            </span>
+                                            <select class="form-select" id="uploadLanguage" name="language">
+                                                <option value="zh">🇹🇼 中文摘要</option>
+                                                <option value="en">🇺🇸 English Summary</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text">
+                                                <i class="bi bi-chat-text"></i>
+                                            </span>
+                                            <select class="form-select" id="uploadPromptType" name="promptType">
+                                                {% for key, prompt in prompts.items() %}
+                                                <option value="{{ key }}" title="{{ prompt.description }}">
+                                                    {{ prompt.name }}
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="bi bi-cloud-upload me-2"></i>上傳並開始處理
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+    
+                        <div class="step-indicator mb-4 d-none" id="progressSteps">
+                            <div class="step" data-step="1">
+                                <div class="step-circle">1</div>
+                                <div class="step-line"></div>
+                                <div class="step-title">下載影片</div>
+                            </div>
+                            <div class="step" data-step="2">
+                                <div class="step-circle">2</div>
+                                <div class="step-line"></div>
+                                <div class="step-title">語音轉文字</div>
+                            </div>
+                            <div class="step" data-step="3">
+                                <div class="step-circle">3</div>
+                                <div class="step-line"></div>
+                                <div class="step-title">AI 摘要</div>
+                            </div>
+                            <div class="step" data-step="4">
+                                <div class="step-circle">4</div>
+                                <div class="step-title">完成</div>
+                            </div>
+                        </div>
+
+                        <div id="statusContainer" class="text-center d-none">
+                            <div class="spinner-border text-primary loading-spinner mb-3"></div>
+                            <p class="lead" id="statusText"></p>
+                        </div>
+
+                        <div id="resultContainer" class="d-none">
+                            <div class="card bg-light">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        <i class="bi bi-file-text me-2"></i>摘要結果
+                                    </h5>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="copyToClipboard()">
+                                        <i class="bi bi-clipboard me-1"></i>複製
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <pre id="summaryText" class="mb-0" style="white-space: pre-wrap;"></pre>
+                                </div>
+                            </div>
+                            <!-- Toast Container -->
+                            <div aria-live="polite" aria-atomic="true" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1055;">
+                                <!-- Toast -->
+                                <div id="copyToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                                    <div class="d-flex">
+                                        <div class="toast-body">
+                                            已複製到剪貼簿！
+                                        </div>
+                                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const socket = io();
+        const progressSteps = document.getElementById('progressSteps');
+        const statusContainer = document.getElementById('statusContainer');
+        const statusText = document.getElementById('statusText');
+        const resultContainer = document.getElementById('resultContainer');
+        const summaryText = document.getElementById('summaryText');
+    
+        function updateSteps(currentStep) {
+            const steps = progressSteps.querySelectorAll('.step');
+            steps.forEach(step => {
+                const stepNum = parseInt(step.dataset.step);
+                step.classList.remove('active', 'completed');
+                if (stepNum < currentStep) {
+                    step.classList.add('completed');
+                } else if (stepNum === currentStep) {
+                    step.classList.add('active');
+                }
+            });
+        }
+    
+        function copyToClipboard() {
+            navigator.clipboard.writeText(summaryText.textContent)
+                .then(() => {
+                    // 顯示 Toast
+                    const toastElement = document.getElementById('copyToast');
+                    const toast = new bootstrap.Toast(toastElement);
+                    toast.show();
+                })
+                .catch(err => {
+                    console.error('複製失敗：', err);
+                });
+        }
+        socket.on('processing_step', function(data) {
+            statusText.textContent = data.message;
+            const currentStep = parseInt(data.step.split('/')[0]);
+            updateSteps(currentStep);
+        });
+    
+        socket.on('processing_complete', function(data) {
+            updateSteps(4);
+            statusContainer.classList.add('d-none');
+            resultContainer.classList.remove('d-none');
+            summaryText.textContent = data.result;
+        });
+    
+        socket.on('processing_error', function(data) {
+            statusText.textContent = '處理失敗：' + data.error;
+            progressSteps.classList.add('d-none');
+        });
+
+        document.getElementById('summarizeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const url = document.getElementById('videoUrl').value;
+            
+            // 基本的前端 URL 驗證
+            const youtubeRegex = /(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)[A-Za-z0-9_-]{11}.*/;
+            if (!youtubeRegex.test(url)) {
+                alert('請輸入有效的 YouTube 影片網址');
+                return;
+            }
+            
+            // 獲取所有必要的值
+            const language = document.getElementById('language').value;
+            const promptType = document.getElementById('promptType').value;
+    
+            // 創建 FormData 並添加值
+            const formData = new FormData();
+            formData.append('url', url);
+            formData.append('language', language);
+            formData.append('promptType', promptType);
+    
+            progressSteps.classList.remove('d-none');
+            statusContainer.classList.remove('d-none');
+            resultContainer.classList.add('d-none');
+            updateSteps(1);
+            statusText.textContent = '開始處理...';
+    
+            // 發送請求
+            fetch('/summarize', {
+                method: 'POST',
+                body: formData
+            }).catch(error => {
+                console.error('請求錯誤:', error);
+                statusText.textContent = '處理失敗：' + error.message;
+            });
+        });
+
+        // 檔案上傳表單提交
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const statusContainer = document.getElementById('statusContainer');
+            const progressSteps = document.getElementById('progressSteps');
+            
+            progressSteps.classList.remove('d-none');
+            statusContainer.classList.remove('d-none');
+            updateSteps(1);
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                // 成功開始處理
+                window.location.href = '/tasks';
+            })
+            .catch(error => {
+                alert('上傳失敗：' + error.message);
+                progressSteps.classList.add('d-none');
+                statusContainer.classList.add('d-none');
+            });
+        });
+    </script>
+</body>
+</html>

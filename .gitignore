@@ -1,0 +1,7 @@
+/storage/
+.env
+.DS_Store
+*.bak
+*.zip
+*.pyc
+*.db
