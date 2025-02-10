@@ -1,0 +1,69 @@
+general:
+  name: 一般摘要
+  description: 生成簡潔的內容摘要
+  icon: card-text
+  template: |
+    對以下 Youtube 影片逐字稿進行摘要，提供重要內容和關鍵訊息的條列式整理。很重要，請使用繁體中文回答。。
+
+detailed:
+  name: 詳細摘要
+  description: 包含時間軸的詳細內容分析
+  icon: list-ol
+  template: |
+    請對以下 Youtube 影片逐字稿內容進行詳細摘要。很重要，請使用繁體中文回答。需要：
+    1. 保留原始時間戳記
+    2. 按時間順序組織內容
+    3. 標出重要觀點和關鍵時刻
+    4. 提供完整的上下文信息
+    
+
+bullet:
+  name: 重點條列
+  description: 簡潔的條列式重點整理
+  icon: check2-square
+  template: |
+    請將這段 Youtube 影片逐字稿內容整理成重點條列式摘要。很重要，請使用繁體中文回答。：
+    1. 使用簡潔的條列項目
+    2. 標示重要人物、事件和數據
+    3. 保持時間順序
+    4. 突出關鍵觀點和結論
+
+news:
+  name: 新聞報導
+  description: 新聞報導風格的內容重整
+  icon: newspaper
+  template: |
+    請以新聞報導逐字稿的風格重新整理這段 Youtube 影片內容。很重要，請使用繁體中文回答。：
+    1. 使用倒金字塔結構
+    2. 開頭要有醒目的導言
+    3. 包含必要的 5W1H 要素
+    4. 客觀呈現事實和各方觀點
+
+financial:
+  name: 財經產業與分析
+  description: 財經產業與分析
+  icon: graph-up
+  template: |
+    使用繁體中文回答。你是一個財經專家，以下是財經 podcast 的逐字稿，逐字最前面如果是廣告可以忽略，中間部分會有一些個人最近的經歷或心得，針對近期股市、產業、經濟分析、個人看法、產業消息或操作進行詳細的條列式整理。
+
+financial(timestamp):
+  name: 財經產業與分析(時間戳)
+  description: 財經產業與分析(時間戳)
+  icon: graph-up
+  template: |
+    你是一個財經專家，以下是財經 podcast 的逐字稿，逐字最前面如果是廣告可以忽略，中間部分會有一些個人最近的經歷或心得，針對近期股市、產業、經濟分析、個人看法、產業消息或操作進行條列式整理並標註時間戳，很重要，請使用繁體中文回答。
+
+financial(stock):
+  name: 個股分析
+  description: 個股分析
+  icon: graph-up
+  template: |
+    使用繁體中文回答。你是一個財經專家，以下是財經 podcast 的逐字稿，逐字最前面如果是廣告可以忽略，中間部分會有一些個人最近的經歷或心得，針對近期股市、產業、經濟分析、個人看法、產業消息或操作進行和各股分析詳細條列式整理。
+
+
+english:
+  name: 英文學習
+  description: 英文學習
+  icon: book
+  template: |
+    此為影片的逐字稿，將逐字稿內容翻譯成中文，並且中英對照輸入。使用繁體中文回答。
