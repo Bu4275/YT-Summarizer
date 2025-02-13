@@ -275,7 +275,11 @@ def get_summary(record_id):
         if record and os.path.exists(record.summary_file):
             with open(record.summary_file, 'r', encoding='utf-8') as f:
                 content = f.read()
-                content = '## Title: ' + record.video_title + '\n\n' + 'Source: ' + record.video_source + '\n\n' + content
+                if not record.video_source.startswith('http'):
+                    source = os.path.basename(record.video_source)
+                else:
+                    source = record.video_source
+                content = '## Title: ' + record.video_title + '\n\n' + 'Source: ' + source + '\n\n' + content
             return jsonify({'success': True, 'content': content})
         return jsonify({'success': False, 'error': 'File not found'})
     finally:

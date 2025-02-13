@@ -122,11 +122,26 @@
                 second: '2-digit'
             });
         }
-        
+
+        // 檢查是否為有效的 URL
+        function isValidURL(url) {
+            try {
+                new URL(url);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
         // 創建任務卡片 HTML
         function createTaskCard(task) {
             const statusDisplay = getTaskStatusDisplay(task.status);
             const progress = task.progress?.percentage || 0;
+
+                // 檢查 task.source 是否為 URL
+            const sourceContent = isValidURL(task.source)
+            ? `<a href="${task.source}" target="_blank" style="max-width: 300px;">${task.source}</a>`
+            : task.source;
 
             return `
             <div class="col-md-6 mb-3" id="task-container-${task.id}">
@@ -139,7 +154,7 @@
                     </div>
                     <div class="card-body">
                         <div class="task-info">
-                            <p class="card-text"><strong>URL:</strong> <a href="${task.source}" target="_blank" style="max-width: 300px;">${task.source}</a></p>
+                            <p class="card-text"><strong>URL:</strong> ${sourceContent}</p>
                             <p class="card-text"><strong>語言:</strong> ${task.language}</p>
                             <p class="card-text"><strong>摘要類型:</strong> ${task.prompt_type}</p>
                         </div>

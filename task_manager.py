@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 import threading
 import enum
 import logging
+import os
 from video_processor import process_video
 from task_progress import TaskProgress
 logger = logging.getLogger(__name__)
@@ -149,9 +150,13 @@ class TaskManager:
 
     def _serialize_task(self, task):
         """將任務序列化為可 JSON 的格式"""
+        if task.is_local:
+            source = os.path.basename(task.source)
+        else:
+            source = task.source
         return {
             'id': task.id,
-            'source': task.source,
+            'source': source,
             'language': task.language,
             'prompt_type': task.prompt_type,
             'status': task.status.value,

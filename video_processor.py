@@ -17,6 +17,7 @@ def process_video(source, language, socketio, prompt_type="general", is_local=Fa
     try:
         if is_local:
             audio_filename = source
+            source = os.path.basename(source)
             video_title = os.path.basename(source)
             progress.update('1/3', '準備處理音頻文件', 33)
         else:

@@ -217,9 +217,13 @@
                                             </td>
                                             <td>{{ record.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                             <td>
-                                                <a href="{{ record.video_source }}" target="_blank">
+                                                {% if record.video_source.startswith('http') %}
+                                                    <a href="{{ record.video_source }}" target="_blank">
+                                                        {{ record.video_title }}
+                                                    </a>
+                                                {% else %}
                                                     {{ record.video_title }}
-                                                </a>
+                                                {% endif %}
                                             </td>
                                             <td>{{ record.language }}</td>
                                             <td>{{ record.prompt_type }}</td>
