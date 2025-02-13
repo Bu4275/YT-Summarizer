@@ -12,6 +12,10 @@ pip install -r requirement.txt
 - 設定 .env 檔案，修改 `OPENAI_API_KEY`
 
 
+- 安裝 cuda，建議查看 pytorch 支援的 cuda 版本
+https://pytorch.org/get-started/locally/
+
+
 ## Usage
 
 ```
