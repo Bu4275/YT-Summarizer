@@ -67,3 +67,10 @@ english:
   icon: book
   template: |
     此為影片的逐字稿，將逐字稿內容翻譯成中文，並且中英對照輸入。使用繁體中文回答。
+
+none:
+  name: 不產生摘要
+  description: 不產生摘要
+  icon: book
+  template: |
+    不產生摘要

@@ -87,18 +87,20 @@ def generate_summary(filename, socketio, prompt_type="general"):
         
         # 使用 prompt_manager 獲取提示詞模板
         prompt_template = prompt_manager.get_prompt_template(prompt_type)
-        
-        response = client.chat.completions.create(
-            model=Config.OPENAI_MODEL,
-            messages=[
-                {"role": "system", "content": prompt_template},
-                {"role": "assistant", "content": '使用繁體中文回答，逐字稿可能因為語音辨識問題導致錯字，根據情境自動修正錯字。'},
-                {"role": "user", "content": transcription}
-            ],
-            temperature=0,
-        )
-        
-        summary = response.choices[0].message.content
+        if prompt_type == "none":
+            summary = "不產生摘要"
+        else:
+            response = client.chat.completions.create(
+                model=Config.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": prompt_template},
+                    {"role": "assistant", "content": '使用繁體中文回答，逐字稿可能因為語音辨識問題導致錯字，根據情境自動修正錯字。'},
+                    {"role": "user", "content": transcription}
+                ],
+                temperature=0,
+            )
+            
+            summary = response.choices[0].message.content
         
         # 生成安全的檔案名稱
         summary_filename = get_safe_filename(os.path.basename(filename), prompt_type)
