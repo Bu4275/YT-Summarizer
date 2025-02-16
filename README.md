@@ -39,6 +39,7 @@ YT-Summarizer is a Python-based application built with Flask that automates the 
 
 - Access the web interface at http://localhost:5000
 
+- You can modify the contents of the `prompts.yaml` file to include your own prompts.
 
 ## Technologies Used
 
