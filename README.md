@@ -53,3 +53,6 @@ YT-Summarizer is a Python-based application built with Flask that automates the 
     
 - **ChatGPT API** (for summarization)
 
+## Screenshot
+
+![image](https://github.com/Bu4275/YT-Summarizer/blob/main/screenshot.png)
